@@ -1,0 +1,24 @@
+{
+    "type": "module",
+    "name": "github-notification",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "build": "node esbuild.js",
+        "push": "clasp push",
+        "open": "clasp open",
+        "deploy": "npm run build && npm run push"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "@google/clasp": "^2.4.2",
+        "@types/google-apps-script": "^1.0.83",
+        "clasp": "^1.0.0",
+        "esbuild": "^0.21.1",
+        "esbuild-gas-plugin": "^0.8.0",
+        "typescript": "^5.4.5"
+    }
+}
