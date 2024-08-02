@@ -2,7 +2,7 @@ import {
     activeSheet,
     COLUMN,
 } from "./constants";
-import { createComment, fetchAllOpenPullRequests, fetchPullRequestComments, fetchPullRequestDetails, getFileList } from "./api";
+import { createComment, fetchAllOpenPullRequestUrls, fetchPullRequestComments, fetchPullRequestDetails, getFileList } from "./api";
 import { findSlackUserIdByGithubAccount, notify } from "./notification";
 import { PullRequest } from "./interfaces";
 import { getReviewCommentByDify } from "./dify";
@@ -40,7 +40,7 @@ export const main = async () => {
     console.log('Start main function');
     const dataTocheckExistingUrls = activeSheet.getDataRange().getValues();
     const existingPRUrlsOnSheet = dataTocheckExistingUrls.map((row) => row[0]);
-    const pullRequestUrls = await fetchAllOpenPullRequests();
+    const pullRequestUrls = await fetchAllOpenPullRequestUrls();
 
     await addNewPullRequests(activeSheet, pullRequestUrls, existingPRUrlsOnSheet);
     await processPullRequests(activeSheet);

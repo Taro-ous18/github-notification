@@ -13,7 +13,25 @@ const getToken = (): string => {
     return token;
 }
 
-const fetchPullRequest = async (endpoint: string, queryParams?: string) => {
+const postRequest = async (endpoint: string, payload: any) => {
+    const token = getToken();
+    const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
+        'method': 'post' as GoogleAppsScript.URL_Fetch.HttpMethod,
+        'headers': {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        'payload': JSON.stringify({
+            body: payload
+        })
+    };
+
+    const response: GoogleAppsScript.URL_Fetch.HTTPResponse = UrlFetchApp.fetch(`${BASE_URL}${endpoint}`, options);
+
+    return response.getResponseCode();
+}
+
+const getRequest = async (endpoint: string, queryParams?: string) => {
     const token = getToken();
     const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
         'method': 'get' as GoogleAppsScript.URL_Fetch.HttpMethod,
@@ -31,22 +49,28 @@ const fetchPullRequest = async (endpoint: string, queryParams?: string) => {
 export const fetchPullRequestComments = async (pullRequest, queryParams?) => {
     const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.prNumber}/comments`;
 
-    return fetchPullRequest(endpoint, queryParams);
+    return getRequest(endpoint, queryParams);
 };
 
 export const fetchPullRequestDetails = async (pullRequest) => {
     const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.prNumber}`;
 
-    return fetchPullRequest(endpoint);
+    return getRequest(endpoint);
 };
 
 export const getFileList = async (pullRequest) => {
     const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.prNumber}/files`;
 
-    return fetchPullRequest(endpoint);
+    return getRequest(endpoint);
 }
 
-export const fetchAllOpenPullRequests = async () => {
+export const createComment = async (pullRequest, body) => {
+    const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/issues/${pullRequest.prNumber}/comments`;
+
+    return postRequest(endpoint, body);
+}
+
+export const fetchAllOpenPullRequestUrls = async () => {
     const repositoriesString = PropertiesService.getScriptProperties().getProperty('REPOSITORIES');
     const repositories = repositoriesString.split(',');
 
@@ -83,22 +107,3 @@ export const fetchAllOpenPullRequests = async () => {
 
     return pullReuqestUrls;
 };
-
-export const createComment = async (pullRequest, body) => {
-    const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/issues/${pullRequest.prNumber}/comments`;
-    const token = getToken();
-    const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
-        'method': 'post' as GoogleAppsScript.URL_Fetch.HttpMethod,
-        'headers': {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-        'payload': JSON.stringify({
-            body: body
-        })
-    };
-
-    const response: GoogleAppsScript.URL_Fetch.HTTPResponse = UrlFetchApp.fetch(`${BASE_URL}${endpoint}`, options);
-
-    return response.getResponseCode();
-}
