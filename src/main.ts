@@ -2,8 +2,39 @@ import {
     activeSheet,
     COLUMN,
 } from "./constants";
-import { fetchAllOpenPullRequests, fetchPullRequestComments, fetchPullRequestDetails } from "./api";
+import { createComment, fetchAllOpenPullRequests, fetchPullRequestComments, fetchPullRequestDetails, getFileList } from "./api";
 import { findSlackUserIdByGithubAccount, notify } from "./notification";
+import { PullRequest } from "./interfaces";
+import { getReviewCommentByDify } from "./dify";
+
+export const executePrReview = async () => {
+    console.log('Start executePrReview function');
+    const dataOnSheet = activeSheet.getDataRange().getValues();
+
+    for (let i = dataOnSheet.length - 1; i > 0; i--) {
+        const pullRequestUrl = dataOnSheet[i][COLUMN.PR_URL];
+        const regex = /github\.com\/([^\/]+)\/([^\/]+)\/pull\/(\d+)$/;
+        const match = (pullRequestUrl as string).match(regex);
+
+        if (match) {
+            const prDetails = {
+                owner: match[1],
+                repository: match[2],
+                prNumber: match[3]
+            };
+            const prFiles = await getFileList(prDetails);
+            const patchesAndUrls = prFiles.map(file => file.patch).join('\n');
+            const response = await getReviewCommentByDify(patchesAndUrls);
+
+            await createComment(prDetails, response);
+        } else {
+            console.error(`Row ${i + 1}: URL is not a valid GitHub pull request URL.`);
+        }
+    
+    }
+    console.log('End executePrReview function');
+
+}
 
 export const main = async () => {
     console.log('Start main function');
@@ -46,7 +77,7 @@ const processPullRequests = async (activeSheet) => {
 }
 
 const processSinglePullRequest = async (dataOnSheet, rowIndex: number, prDetails) => {
-    const pullRequest = await fetchPullRequestDetails(prDetails);
+    const pullRequest: PullRequest = await fetchPullRequestDetails(prDetails);
     const prUrl = dataOnSheet[rowIndex][COLUMN.PR_URL];
     const authorLogin = dataOnSheet[rowIndex][COLUMN.PR_OWNER] || pullRequest.user.login;
     const lastestFetchedAt = dataOnSheet[rowIndex][COLUMN.FETCHED_AT];
@@ -55,7 +86,7 @@ const processSinglePullRequest = async (dataOnSheet, rowIndex: number, prDetails
         activeSheet.deleteRow(rowIndex + 1);
 
         const slackUserId = await findSlackUserIdByGithubAccount(authorLogin);
-        // notify(slackUserId, 'プルリクエストがクローズされました。', prUrl);
+        notify(slackUserId, 'プルリクエストがクローズされました。', prUrl);
     } else if (!dataOnSheet[rowIndex][COLUMN.PR_OWNER]) {
         activeSheet.getRange(rowIndex + 1, 4).setValue(pullRequest.user.login);
     }
@@ -78,7 +109,7 @@ const processSinglePullRequest = async (dataOnSheet, rowIndex: number, prDetails
 
         if (exceptedOwnComments.length > 0) {
             const slackUserId = await findSlackUserIdByGithubAccount(authorLogin);
-            // notify(slackUserId, `新しいコメントが${exceptedOwnComments.length}件あります`, prUrl);
+            notify(slackUserId, `新しいコメントが${exceptedOwnComments.length}件あります`, prUrl);
             console.log('新しいコメントがあります');
         }
     }
@@ -89,7 +120,7 @@ const processSinglePullRequest = async (dataOnSheet, rowIndex: number, prDetails
         activeSheet.getRange(rowIndex + 1, 5).setValue(requestedReviewer);
         activeSheet.getRange(rowIndex + 1, 6).setValue(1);
         const slackUserId = await findSlackUserIdByGithubAccount(requestedReviewer);
-        // notify(slackUserId, 'レビュワーにアサインされました', prUrl);
+        notify(slackUserId, 'レビュワーにアサインされました', prUrl);
         console.log('レビュワーにアサインされました');
     }
     // } else if (requestedReviewer && dataOnSheet[rowIndex][5]) {

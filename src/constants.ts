@@ -6,6 +6,10 @@ export const mappingSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByNa
 export const BASE_URL = 'https://api.github.com/';
 export const OWNER = PropertiesService.getScriptProperties().getProperty('OWNER');
 
+export const DIFY_URL = PropertiesService.getScriptProperties().getProperty('DIFY_URL');
+export const DIFY_API_KEY = PropertiesService.getScriptProperties().getProperty('DIFY_API_KEY');
+export const DIFY_USER_NAME = PropertiesService.getScriptProperties().getProperty('DIFY_USER_NAME');
+
 //　シートのカラム定義
 export const COLUMN = {
     PR_URL: 0,
