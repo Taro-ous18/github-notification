@@ -2,7 +2,7 @@ import {
     activeSheet,
     COLUMN,
 } from "./constants";
-import { createComment, fetchAllOpenPullRequestUrls, fetchPullRequestComments, fetchPullRequestDetails, getFileList } from "./api";
+import { createComment, fetchAllOpenPullRequestUrls, fetchPullRequest, fetchPullRequestComments, fetchPullRequestFiles } from "./api";
 import { findSlackUserIdByGithubAccount, notify } from "./notification";
 import { PullRequest } from "./interfaces";
 import { getReviewCommentByDify } from "./dify";
@@ -22,7 +22,7 @@ export const executePrReview = async () => {
                 repository: match[2],
                 prNumber: match[3]
             };
-            const prFiles = await getFileList(prDetails);
+            const prFiles = await fetchPullRequestFiles(prDetails);
             const patchesAndUrls = prFiles.map(file => file.patch).join('\n');
             const response = await getReviewCommentByDify(patchesAndUrls);
 
@@ -77,7 +77,7 @@ const processPullRequests = async (activeSheet) => {
 }
 
 const processSinglePullRequest = async (dataOnSheet, rowIndex: number, prDetails) => {
-    const pullRequest: PullRequest = await fetchPullRequestDetails(prDetails);
+    const pullRequest: PullRequest = await fetchPullRequest(prDetails);
     const prUrl = dataOnSheet[rowIndex][COLUMN.PR_URL];
     const authorLogin = dataOnSheet[rowIndex][COLUMN.PR_OWNER] || pullRequest.user.login;
     const lastestFetchedAt = dataOnSheet[rowIndex][COLUMN.FETCHED_AT];

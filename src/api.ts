@@ -52,13 +52,13 @@ export const fetchPullRequestComments = async (pullRequest, queryParams?) => {
     return getRequest(endpoint, queryParams);
 };
 
-export const fetchPullRequestDetails = async (pullRequest) => {
+export const fetchPullRequest = async (pullRequest) => {
     const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.prNumber}`;
 
     return getRequest(endpoint);
 };
 
-export const getFileList = async (pullRequest) => {
+export const fetchPullRequestFiles = async (pullRequest) => {
     const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.prNumber}/files`;
 
     return getRequest(endpoint);
