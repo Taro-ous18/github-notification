@@ -1,6 +1,18 @@
 import { BASE_URL, mappingSheet, OWNER } from "./constants";
 import { PullRequest } from "./interfaces";
 
+
+
+const getToken = (): string => {
+    const token = PropertiesService.getScriptProperties().getProperty('TOKEN');
+
+    if (!token) {
+        console.error('Token is not set, please set it in the script properties from project settings.');
+        return;
+    }
+    return token;
+}
+
 const fetchPullRequest = async (endpoint: string, queryParams?: string) => {
     const token = getToken();
     const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
@@ -27,6 +39,12 @@ export const fetchPullRequestDetails = async (pullRequest) => {
 
     return fetchPullRequest(endpoint);
 };
+
+export const getFileList = async (pullRequest) => {
+    const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.prNumber}/files`;
+
+    return fetchPullRequest(endpoint);
+}
 
 export const fetchAllOpenPullRequests = async () => {
     const repositoriesString = PropertiesService.getScriptProperties().getProperty('REPOSITORIES');
@@ -66,13 +84,21 @@ export const fetchAllOpenPullRequests = async () => {
     return pullReuqestUrls;
 };
 
-const getToken = (): string => {
-    const token: string | null = PropertiesService.getScriptProperties().getProperty('TOKEN');
+export const createComment = async (pullRequest, body) => {
+    const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/issues/${pullRequest.prNumber}/comments`;
+    const token = getToken();
+    const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
+        'method': 'post' as GoogleAppsScript.URL_Fetch.HttpMethod,
+        'headers': {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        'payload': JSON.stringify({
+            body: body
+        })
+    };
 
-    if (token === null) {
-        console.error('Token is not set, please set it in the script properties from project settings.');
-        return;
-    }
+    const response: GoogleAppsScript.URL_Fetch.HTTPResponse = UrlFetchApp.fetch(`${BASE_URL}${endpoint}`, options);
 
-    return token;
+    return response.getResponseCode();
 }

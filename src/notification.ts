@@ -1,6 +1,6 @@
-import { mappingSheet } from "./constants";
+import { mappingSheet, SUB_SHEET_COLUMN } from "./constants";
 
-export const notify = (slackUserId: string, notificationMsg: string, paylaod: object) => {
+export const notify = (slackUserId: string, notificationMsg: string, paylaod) => {
     const slackWebhookUrl = PropertiesService.getScriptProperties().getProperty('WEBHOOK_URL');
 
     if (!slackWebhookUrl) {
@@ -48,8 +48,8 @@ export const findSlackUserIdByGithubAccount = async (githubAccount: string) => {
     }
 
     for (let i = 1; i < values.length; i++) {
-        if (values[i][0] === githubAccount) {
-            const slackUserId = values[i][1]; // target slack user id
+        if (values[i][SUB_SHEET_COLUMN.GITHUB_ACCOUNT] === githubAccount) {
+            const slackUserId = values[i][SUB_SHEET_COLUMN.SLACK_USER_ID]; // target slack user id
 
             if (isValidSlackUserId(slackUserId)) {
                 return slackUserId;
