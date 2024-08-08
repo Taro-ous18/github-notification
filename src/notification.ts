@@ -1,6 +1,7 @@
 import { mappingSheet, SUB_SHEET_COLUMN } from "./constants";
+import { NotifyParams } from "./interfaces";
 
-export const notify = (slackUserId: string, notificationMsg: string, paylaod) => {
+export const notify = (params: NotifyParams) => {
     const slackWebhookUrl = PropertiesService.getScriptProperties().getProperty('WEBHOOK_URL');
 
     if (!slackWebhookUrl) {
@@ -8,9 +9,8 @@ export const notify = (slackUserId: string, notificationMsg: string, paylaod) =>
         return;
     }
 
-    const mention = slackUserId ? `<@${slackUserId}>` : '';
-    const message = `${mention} ${notificationMsg} \n${paylaod}\n`;
-
+    const mention = params.slackUserId ? `<@${params.slackUserId}>` : '';
+    const message = `${mention} ${params.message} \n${params.pullRequestUrl}\n`;
     const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
         method: 'post' as GoogleAppsScript.URL_Fetch.HttpMethod,
         contentType: 'application/json',
@@ -25,8 +25,6 @@ export const notify = (slackUserId: string, notificationMsg: string, paylaod) =>
 
         if (responseCode !== 200) {
             console.error(`Failed to send notification to Slack. HTTP response code: ${responseCode}`);
-        } else {
-            console.log('Notification sent to Slack successfully.');
         }
     } catch (error) {
         console.error(`Error occured while sending notification to slack: ${error}`);
