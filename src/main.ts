@@ -62,7 +62,7 @@ export const executePrReview = async () => {
 				const params = {
 					slackUserId: null,
 					message: '[Dify]変更差分から要約したコメントを追加しました。',
-					pullRequestUrl: `${pullRequestUrl}##issuecomment-${createdComment.id}`
+					pullRequestUrl: `${pullRequestUrl}#issuecomment-${createdComment.id}`
 				}
 
 				notify(params);
