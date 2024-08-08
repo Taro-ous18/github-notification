@@ -1,7 +1,7 @@
-import { BASE_URL, mappingSheet, OWNER } from "./constants";
-import { PullRequest } from "./interfaces";
-
-
+import { BASE_URL, DIFY_API_KEY, DIFY_URL, DIFY_USER_NAME, mappingSheet, OWNER } from "./constants";
+import { PullRequest, PullRequestMeta } from "./interfaces";
+import { sendMail } from "./mail";
+import { deserializeArray, serializeArray } from "./util";
 
 const getToken = (): string => {
     const token = PropertiesService.getScriptProperties().getProperty('TOKEN');
@@ -13,7 +13,7 @@ const getToken = (): string => {
     return token;
 }
 
-const postRequest = async (endpoint: string, payload: any) => {
+const postRequest = async (endpoint: string, payload: object) => {
     const token = getToken();
     const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
         'method': 'post' as GoogleAppsScript.URL_Fetch.HttpMethod,
@@ -21,14 +21,12 @@ const postRequest = async (endpoint: string, payload: any) => {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
         },
-        'payload': JSON.stringify({
-            body: payload
-        })
+        'payload': JSON.stringify(payload)
     };
 
     const response: GoogleAppsScript.URL_Fetch.HTTPResponse = UrlFetchApp.fetch(`${BASE_URL}${endpoint}`, options);
 
-    return response.getResponseCode();
+    return JSON.parse(response.getContentText());
 }
 
 const getRequest = async (endpoint: string, queryParams?: string) => {
@@ -46,28 +44,65 @@ const getRequest = async (endpoint: string, queryParams?: string) => {
     return JSON.parse(response.getContentText());
 };
 
-export const fetchPullRequestComments = async (pullRequest, queryParams?) => {
-    const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.prNumber}/comments`;
+const patchRequest = async (endpoint: string, payload: object) => {
+    const token = getToken();
+    const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
+        'method': 'patch' as GoogleAppsScript.URL_Fetch.HttpMethod,
+        'headers': {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        'payload': JSON.stringify(payload)
+    };
 
-    return getRequest(endpoint, queryParams);
+    const response: GoogleAppsScript.URL_Fetch.HTTPResponse = UrlFetchApp.fetch(`${BASE_URL}${endpoint}`, options);
+
+    return JSON.parse(response.getContentText());
+}
+
+const deleteRequest = async (endpoint: string) => {
+    const token = getToken();
+    const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
+        'method': 'delete' as GoogleAppsScript.URL_Fetch.HttpMethod,
+        'headers': {
+            'Authorization': `Bearer ${token}`,
+        }
+    };
+
+    const response: GoogleAppsScript.URL_Fetch.HTTPResponse = UrlFetchApp.fetch(`${BASE_URL}${endpoint}`, options);
+
+    return response.getResponseCode();
+}
+
+
+/**
+ * API DOC 
+ * https://docs.github.com/ja/rest/pulls/comments?apiVersion=2022-11-28#list-review-comments-on-a-pull-request
+ */
+export const fetchPullRequestComments = async (pullRequest: PullRequestMeta, queryParams?) => {
+    return getRequest(`repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.number}/comments`, queryParams);
 };
 
-export const fetchPullRequestDetails = async (pullRequest) => {
-    const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.prNumber}`;
-
-    return getRequest(endpoint);
+export const fetchPullRequest = async (pullRequest: PullRequestMeta) => {
+    return getRequest(`repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.number}`);
 };
 
-export const getFileList = async (pullRequest) => {
-    const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.prNumber}/files`;
-
-    return getRequest(endpoint);
+export const fetchPullRequestFiles = async (pullRequest: PullRequestMeta) => {
+    return getRequest(`repos/${pullRequest.owner}/${pullRequest.repository}/pulls/${pullRequest.number}/files`);
 }
 
 export const createComment = async (pullRequest, body) => {
-    const endpoint = `repos/${pullRequest.owner}/${pullRequest.repository}/issues/${pullRequest.prNumber}/comments`;
+    const payload = {
+        'body': body
+    }
+    return postRequest(`repos/${pullRequest.owner}/${pullRequest.repository}/issues/${pullRequest.number}/comments`, payload);
+}
 
-    return postRequest(endpoint, body);
+export const updateComment = async (pullRequest, commentId, body) => {
+    const payload = {
+        'body': body
+    }
+    return patchRequest(`repos/${pullRequest.owner}/${pullRequest.repository}/issues/comments/${commentId}`, payload);
 }
 
 export const fetchAllOpenPullRequestUrls = async () => {
@@ -107,3 +142,46 @@ export const fetchAllOpenPullRequestUrls = async () => {
 
     return pullReuqestUrls;
 };
+
+
+/**
+ * This function is used to get the review comment from Dify
+ */
+export const getReviewCommentByDify = (payload) => {
+	const payloadString = serializeArray(payload);
+	const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
+		'method': 'post' as GoogleAppsScript.URL_Fetch.HttpMethod,
+		'headers': {
+			'Authorization': `Bearer ${DIFY_API_KEY}`,
+			'Content-Type': 'application/json',
+		},
+		'payload': JSON.stringify({
+			'inputs': {
+				'patch': payloadString
+			},
+			'response_mode': 'blocking',
+			'user': DIFY_USER_NAME
+		})
+	}
+
+	const response: GoogleAppsScript.URL_Fetch.HTTPResponse = UrlFetchApp.fetch(DIFY_URL, options);
+	const responseCode = response.getResponseCode();
+
+	if (responseCode === 400) {
+		sendMail(`Invalid request to Dify. status code: ${responseCode}`);
+		return;
+	}
+
+	if (responseCode >= 500 && responseCode <= 504) {
+		sendMail(`An error occurred on the Dify side. status code: ${responseCode}`);
+		return;
+	}
+
+	const deserializedResponse = deserializeArray(response.getContentText());
+
+	if (deserializedResponse.data.error !== null) {
+		sendMail(`Error occured while fetching review comment from Dify: ${deserializedResponse.error}`);
+	}
+
+	return deserializeArray(response.getContentText()).data.outputs.data;
+}

@@ -1,4 +1,4 @@
-const getOwnerEmailAddress = (): string => {
+export const getOwnerEmailAddress = (): string => {
     return PropertiesService.getScriptProperties().getProperty('EMAIL_ADDRESS');
 }
 
