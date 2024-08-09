@@ -203,6 +203,14 @@ const processSinglePullRequest = async (dataOnSheet, rowIndex: number, prDetails
 	// レビュワー欄が空の場合、レビュワーをシートに書き込む
 	if (!dataOnSheet[rowIndex][COLUMN.PR_REVIEWER]) {
 		activeSheet.getRange(rowIndex + 1, COLUMN.PR_REVIEWER + 1).setValue(pullRequest.requested_reviewers[0].login);
+		
+		const params = {
+			slackUserId: await findSlackUserIdByGithubAccount(pullRequest.requested_reviewers[0].login),
+			message: 'レビュワーにアサインされました。',
+			pullRequestUrl: prUrl
+		}
+
+		notify(params);
 	}
 
 	const comments: PullRequestComment[] = await fetchPullRequestComments(prDetails, lastestFetchedAt ? `since=${lastestFetchedAt}` : undefined);
