@@ -1,6 +1,6 @@
 import { BASE_URL, DIFY_API_KEY, DIFY_URL, DIFY_USER_NAME, mappingSheet, OWNER } from "./constants";
 import { PullRequest, PullRequestMeta } from "./interfaces";
-import { sendMail } from "./mail";
+import { getOwnerEmailAddress, sendMail } from "./mail";
 import { deserializeArray, serializeArray } from "./util";
 
 const getToken = (): string => {
@@ -40,7 +40,7 @@ const getRequest = async (endpoint: string, queryParams?: string) => {
 
     const requestUrl = `${BASE_URL}${endpoint}${queryParams ? `?${queryParams}` : ''}`;
     const response: GoogleAppsScript.URL_Fetch.HTTPResponse = UrlFetchApp.fetch(requestUrl, options);
-    
+
     return JSON.parse(response.getContentText());
 };
 
@@ -148,40 +148,46 @@ export const fetchAllOpenPullRequestUrls = async () => {
  * This function is used to get the review comment from Dify
  */
 export const getReviewCommentByDify = (payload) => {
-	const payloadString = serializeArray(payload);
-	const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
-		'method': 'post' as GoogleAppsScript.URL_Fetch.HttpMethod,
-		'headers': {
-			'Authorization': `Bearer ${DIFY_API_KEY}`,
-			'Content-Type': 'application/json',
-		},
-		'payload': JSON.stringify({
-			'inputs': {
-				'patch': payloadString
-			},
-			'response_mode': 'blocking',
-			'user': DIFY_USER_NAME
-		})
-	}
+    const payloadString = serializeArray(payload);
+    const options: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
+        'method': 'post' as GoogleAppsScript.URL_Fetch.HttpMethod,
+        'headers': {
+            'Authorization': `Bearer ${DIFY_API_KEY}`,
+            'Content-Type': 'application/json',
+        },
+        'payload': JSON.stringify({
+            'inputs': {
+                'patch': payloadString
+            },
+            'response_mode': 'blocking',
+            'user': DIFY_USER_NAME
+        })
+    }
 
-	const response: GoogleAppsScript.URL_Fetch.HTTPResponse = UrlFetchApp.fetch(DIFY_URL, options);
-	const responseCode = response.getResponseCode();
+    const response: GoogleAppsScript.URL_Fetch.HTTPResponse = UrlFetchApp.fetch(DIFY_URL, options);
+    const responseCode = response.getResponseCode();
 
-	if (responseCode === 400) {
-		sendMail(`Invalid request to Dify. status code: ${responseCode}`);
-		return;
-	}
+    if (responseCode === 400) {
+        // sendMail(`Invalid request to Dify. status code: ${responseCode}`, null);
+        return;
+    }
 
-	if (responseCode >= 500 && responseCode <= 504) {
-		sendMail(`An error occurred on the Dify side. status code: ${responseCode}`);
-		return;
-	}
+    if (responseCode >= 500 && responseCode <= 504) {
+        // sendMail(`An error occurred on the Dify side. status code: ${responseCode}`, null);
+        return;
+    }
 
-	const deserializedResponse = deserializeArray(response.getContentText());
+    const deserializedResponse = deserializeArray(response.getContentText());
 
-	if (deserializedResponse.data.error !== null) {
-		sendMail(`Error occured while fetching review comment from Dify: ${deserializedResponse.error}`);
-	}
+    if (deserializedResponse.data.error !== null) {
+        const emailAddress = getOwnerEmailAddress();
+        const subject = '[Error] [Github-notification] Error occured while processing Dify PR review';
+        const body = `Error occured in Dify while processing PR review: ${deserializedResponse.data.error}`;
 
-	return deserializeArray(response.getContentText()).data.outputs.data;
+        sendMail(subject, body, emailAddress);
+
+        return;
+    }
+
+    return deserializeArray(response.getContentText()).data.outputs.data;
 }
