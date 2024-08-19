@@ -2,15 +2,12 @@ export const getOwnerEmailAddress = (): string => {
     return PropertiesService.getScriptProperties().getProperty('EMAIL_ADDRESS');
 }
 
-export const sendMail = (body: string, emailAddress?: string): number => {
+export const sendMail = (subject, body, emailAddress): number => {
     try {
-        if (!emailAddress) {
-            emailAddress = getOwnerEmailAddress();
-        }
-
         MailApp.sendEmail({
             to: emailAddress,
-            body: body
+            subject: subject,
+            body: body,
         });
 
         return 200;

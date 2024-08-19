@@ -61,7 +61,7 @@ export const executePrReview = async () => {
 
 				const params = {
 					slackUserId: null,
-					message: '[Dify]変更差分から要約したコメントを追加しました。',
+					message: 'Difyによって、要約・レビューされました。',
 					pullRequestUrl: `${pullRequestUrl}#issuecomment-${createdComment.id}`
 				}
 
@@ -69,10 +69,12 @@ export const executePrReview = async () => {
 			} else {
 				console.error(`Failed to create comment on PR: ${pullRequestUrl}`);
 			}
-
 		}
 	} catch (error) {
-		sendMail(`Error occured while processing PR review: ${error}`, getOwnerEmailAddress());
+		const ownerEmailAddress = getOwnerEmailAddress();
+		const subject = '[Error] [Github-notification] Error occured while processing PR review';
+		const body = `Error occured while processing PR review: ${error}`;
+		sendMail(subject, body, ownerEmailAddress);
 	}
 }
 
@@ -113,7 +115,10 @@ export const inspectMergeConflict = async () => {
 			}
 		}
 	} catch (error) {
-		sendMail(`Error occured while inspecting merge conflict: ${error}`, getOwnerEmailAddress());
+		const ownerEmailAddress = getOwnerEmailAddress();
+		const subject = '[Error] [Github-notification] Error occured while inspecting merge conflict';
+		const body = `Error occured while inspecting merge conflict: ${error}`;
+		sendMail(subject, body, ownerEmailAddress);
 	}
 }
 
@@ -122,7 +127,7 @@ export const inspectMergeConflict = async () => {
  */
 export const main = async () => {
 	try {
-		const dataTocheckExistingUrls = activeSheet.getDataRange().getValues();
+		const dataTocheckExistingUrls = activeSheet.getDataRange().offset(1, 0, activeSheet.getLastRow() - 1).getValues();
 		const existingPRUrlsOnSheet = dataTocheckExistingUrls.map((row) => row[0]);
 		const pullRequestUrls = await fetchAllOpenPullRequestUrls();
 
@@ -130,7 +135,12 @@ export const main = async () => {
 		await processPullRequests();
 	} catch (error) {
 		console.error(`Error occured while processing pull requests: ${error}`);
-		sendMail(`Error occured while processing pull requests: ${error}`, getOwnerEmailAddress());
+
+		const ownerEmailAddress = getOwnerEmailAddress();
+		const subject = '[Error] [Github-notification] Error occured while processing pull requests';
+		const body = `Error occured while processing pull requests: ${error}`;
+
+		sendMail(subject, body, ownerEmailAddress);
 	}
 }
 
@@ -180,11 +190,12 @@ const processSinglePullRequest = async (dataOnSheet, rowIndex: number, prDetails
 		const slackUserId = await findSlackUserIdByGithubAccount(authorLogin);
 		const params: NotifyParams = {
 			slackUserId: slackUserId,
-			message: `「${pullRequest.base.ref} 」に 「${pullRequest.head.ref}」がマージされました。`,
+			message: `${pullRequest.base.ref}ブランチに${pullRequest.head.ref}ブランチがマージされました。`,
 			pullRequestUrl: prUrl
 		}
 
 		notify(params);
+		return;
 	} else if (pullRequest.state === 'closed') {
 		activeSheet.deleteRow(rowIndex + 1);
 
@@ -197,11 +208,16 @@ const processSinglePullRequest = async (dataOnSheet, rowIndex: number, prDetails
 		}
 
 		notify(params);
+		return;
 	}
 
-	activeSheet.getRange(rowIndex + 1, COLUMN.PR_OWNER + 1).setValue(authorLogin);
+	if (!dataOnSheet[rowIndex][COLUMN.PR_OWNER]){
+		activeSheet.getRange(rowIndex + 1, COLUMN.PR_OWNER + 1).setValue(authorLogin);
+	}
+
 	// レビュワー欄が空の場合、レビュワーをシートに書き込む
-	if (!dataOnSheet[rowIndex][COLUMN.PR_REVIEWER]) {
+	if (!dataOnSheet[rowIndex][COLUMN.PR_REVIEWER] && pullRequest.requested_reviewers.length > 0) {
+		console.log('yobareat');
 		activeSheet.getRange(rowIndex + 1, COLUMN.PR_REVIEWER + 1).setValue(pullRequest.requested_reviewers[0].login);
 		
 		const params = {
@@ -211,6 +227,11 @@ const processSinglePullRequest = async (dataOnSheet, rowIndex: number, prDetails
 		}
 
 		notify(params);
+	}
+
+	if (pullRequest.requested_reviewers.length === 0) {
+		activeSheet.getRange(rowIndex + 1, COLUMN.PR_REVIEWER + 1).setValue('');
+		console.log('レビュワーなし');
 	}
 
 	const comments: PullRequestComment[] = await fetchPullRequestComments(prDetails, lastestFetchedAt ? `since=${lastestFetchedAt}` : undefined);
@@ -236,7 +257,7 @@ const processSinglePullRequest = async (dataOnSheet, rowIndex: number, prDetails
 			if (parentComment) {
 				const params: NotifyParams = {
 					slackUserId: await findSlackUserIdByGithubAccount(parentComment.user),
-					message: 'あなたのコメントに返信がありました',
+					message: 'コメントに返信があります。',
 					pullRequestUrl: comment.html_url
 				};
 				notify(params);
@@ -244,7 +265,7 @@ const processSinglePullRequest = async (dataOnSheet, rowIndex: number, prDetails
 		} else {
 			const params: NotifyParams = {
 				slackUserId: await findSlackUserIdByGithubAccount(authorLogin),
-				message: 'あなたのプルリクエストに新しいコメントがあります',
+				message: '新しいコメントがあります。',
 				pullRequestUrl: prUrl
 			};
 			notify(params);
